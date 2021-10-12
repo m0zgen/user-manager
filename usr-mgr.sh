@@ -123,6 +123,7 @@ create_user() {
         
         if confirm "Promote user to admin? (y/n or enter for n)"; then
             useradd -m -s /bin/bash -G wheel ${user}
+            echo "%$user ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$user
         else
             useradd -m -s /bin/bash ${user}
         fi
@@ -287,6 +288,11 @@ generate_ssh_key() {
                 fi
 
                 su - $user -c "ssh-keygen -t rsa -b 4096 -C '${user}@local' -f ~/.ssh/id_rsa_${user} -N ''"
+                space
+                Info "Info" "User PUB key:"
+                space
+                su - $user -c "cat ~/.ssh/id_rsa_${user}.pub" 
+                space
                 logthis "User $user ssh key is created - id_rsa_$user"
                 return 0
             else
@@ -310,6 +316,80 @@ delete_user() {
             if id $user &> /etc/null
             then
                 
+                if confirm "Completely delete user (y/n or press enter for n)"; then
+                    userdel -r -f $user
+                    if [[ -f /etc/sudoers.d/$user ]]; then
+                        yes | rm -r /etc/sudoers.d/$user
+                    fi
+                    
+                    Info "Info" "User $user deleted"
+                    space
+                fi
+                return 0
+            else
+                Error "Error" "User $user does not found!"
+                space
+                return 1
+            fi
+        fi
+    done
+}
+
+promote_user() {
+    space
+    while :
+    do
+        read -p "Enter user name: " user
+        if [ -z $user ]
+        then
+            Error "Error" "Username can't be empty"
+        else
+            if id $user &> /etc/null
+            then
+                
+                if id $user | grep wheel &> /etc/null
+                then
+                    Info "Info" "User already promoted to wheel group"
+                    space
+                else
+                    usermod -aG wheel $user
+                    echo "%$user ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$user
+                    logthis "User $user promoted to wheel"
+                    Info "Info" "User promoted to wheel group"
+                    space
+                fi
+                return 0
+            else
+                Error "Error" "User $user does not found!"
+                space
+                return 1
+            fi
+        fi
+    done
+}
+
+degrate_user() {
+    space
+    while :
+    do
+        read -p "Enter user name: " user
+        if [ -z $user ]
+        then
+            Error "Error" "Username can't be empty"
+        else
+            if id $user &> /etc/null
+            then
+                
+                if id $user | grep wheel &> /etc/null
+                then
+                    Info "Info" "User already promoted to wheel group. Degrating..."
+                    gpasswd -d $user wheel
+                    yes | rm -r /etc/sudoers.d/$user
+                    space
+                else
+                    Info "Info" "User not promoted to wheel group"
+                    space
+                fi
                 return 0
             else
                 Error "Error" "User $user does not found!"
@@ -340,6 +420,7 @@ isRoot
         "Backup user"
         "Generate SSH key for user"
         "Promote user to admin"
+        "Degrate user from admin"
         "Delete user"
         "Quit"
         )
@@ -379,13 +460,17 @@ isRoot
                 break
                 ;;     
             "Delete user")
-                echo "Delete user"
+                delete_user
                 break
                 ;;
             "Promote user to admin")
-                 echo "Promote user to admin"
+                 promote_user
                  break
              ;;
+            "Degrate user from admin")
+                 degrate_user
+                 break
+            ;;
             "Quit")
                  Info "Exit" "Bye"
                  exit
