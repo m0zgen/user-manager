@@ -13,8 +13,9 @@ cd $SCRIPT_PATH
 ME=`basename "$0"`
 BACKUPS=$SCRIPT_PATH/backups
 SERVER_NAME=`hostname`
-SERVER_IP=$(hostname -I | cut -d' ' -f1)
+SERVER_IP=`hostname -I | cut -d' ' -f1`
 LOG=$SCRIPT_PATH/actions.log
+DISTRO_UNAME=`uname`
 
 # Output messages
 # ---------------------------------------------------\
@@ -83,6 +84,30 @@ isRoot() {
     fi
 }
 
+# Checks supporting distros
+checkDistro() {
+    # Checking distro
+    if [ -e /etc/centos-release ]; then
+        DISTRO=`cat /etc/redhat-release | awk '{print $1,$4}'`
+        RPM=1
+    elif [ -e /etc/fedora-release ]; then
+        DISTRO=`cat /etc/fedora-release | awk '{print ($1,$3~/^[0-9]/?$3:$4)}'`
+        RPM=2
+    elif [ -e /etc/os-release ]; then
+        DISTRO=`lsb_release -d | awk -F"\t" '{print $2}'`
+        RPM=0
+        DEB=1
+    fi
+
+    if [[ "$DISTRO_UNAME" == 'Linux' ]]; then
+        _LINUX=1
+        Warn "Server info" "${SERVER_NAME} ${SERVER_IP} (${DISTRO}"
+    else
+        _LINUX=0
+        Error "Error" "Your distribution is not supported (yet)"
+    fi
+}
+
 # Yes / No confirmation
 confirm() {
     # call with a prompt string or use a default
@@ -148,6 +173,8 @@ list_users() {
     do
         echo "User: $user , $(id $user | cut -d " " -f 1)"
     done
+    root_info=$(cat /etc/passwd | grep root)
+    Info "Root info" "${root_info}"
     space
 }
 
@@ -403,8 +430,7 @@ degrate_user() {
 # Actions
 # ---------------------------------------------------\
 isRoot
-
-
+checkDistro
 
 # User menu rotator
   while true
